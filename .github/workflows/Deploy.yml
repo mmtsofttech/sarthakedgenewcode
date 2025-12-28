@@ -1,4 +1,4 @@
-name: Deploy to Hostinger 
+name: Deploy to Hostinger (Safe + Backup + Cleanup)
 
 on:
   push:
@@ -10,58 +10,67 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
+      
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Deploy via SSH using GitHub secret directly
+     
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
           host: 72.61.237.199
           username: sarthakedge1
-          key: ${{ secrets.SSH_KEY }}      # Use GitHub secret directly
+          key: ${{ secrets.SSH_KEY }}
           script: |
-            # Set variables
-            TIMESTAMP=$(date +"%Y%m%d%H%M%S")
-            BACKUP_DIR=/home/sarthakedge1/htdocs/beta.sarthakedge.com_backup_$TIMESTAMP
-            TARGET_DIR=/home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
+            set -e
 
-            # Backup existing site if it exists
+            BASE_DIR=/home/sarthakedge1/htdocs
+            TARGET_DIR=$BASE_DIR/beta.sarthakedge.com/php_code
+            TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+            BACKUP_DIR=$BASE_DIR/beta.sarthakedge.com_backup_$TIMESTAMP
+
+            echo " Creating backup..."
             if [ -d "$TARGET_DIR" ]; then
               cp -r $TARGET_DIR $BACKUP_DIR
             fi
 
-            # Deploy new code from repo
-            rsync -avz --delete --exclude=".git" --exclude="node_modules" ./ $TARGET_DIR/
+            echo " Keeping only last 3 backups..."
+            ls -dt $BASE_DIR/beta.sarthakedge.com_backup_* | tail -n +4 | xargs -r rm -rf
 
-            # Create required Laravel folders if missing
-            mkdir -p $TARGET_DIR/storage/framework/cache \
-                     $TARGET_DIR/storage/framework/views \
-                     $TARGET_DIR/storage/logs \
-                     $TARGET_DIR/bootstrap/cache \
-                     $TARGET_DIR/tmp \
-                     $TARGET_DIR/.cache
+            echo " Deploying new code..."
+            rsync -avz --delete \
+              --exclude=".git" \
+              --exclude="node_modules" \
+              ./ $TARGET_DIR/
 
-            # Set ownership and permissions
+            echo " Creating Laravel required folders..."
+            mkdir -p \
+              $TARGET_DIR/storage/framework/cache \
+              $TARGET_DIR/storage/framework/views \
+              $TARGET_DIR/storage/logs \
+              $TARGET_DIR/bootstrap/cache \
+              $TARGET_DIR/tmp \
+              $TARGET_DIR/.cache
+
+            echo " Setting permissions..."
             chown -R sarthakedge1:sarthakedge1 $TARGET_DIR
             find $TARGET_DIR -type d -exec chmod 755 {} \;
             find $TARGET_DIR -type f -exec chmod 644 {} \;
 
-            chmod -R 775 $TARGET_DIR/storage \
-                         $TARGET_DIR/bootstrap/cache \
-                         $TARGET_DIR/tmp \
-                         $TARGET_DIR/.cache
+            chmod -R 775 \
+              $TARGET_DIR/storage \
+              $TARGET_DIR/bootstrap/cache \
+              $TARGET_DIR/tmp \
+              $TARGET_DIR/.cache
 
-            # Clear Laravel cache and logs
-            rm -rf $TARGET_DIR/storage/framework/cache/*
-            rm -rf $TARGET_DIR/storage/framework/views/*
-            rm -rf $TARGET_DIR/storage/logs/*.log
-            rm -rf $TARGET_DIR/tmp/*
-            rm -rf $TARGET_DIR/.cache/*
+            echo " Clearing Laravel cache..."
+            rm -rf \
+              $TARGET_DIR/storage/framework/cache/* \
+              $TARGET_DIR/storage/framework/views/* \
+              $TARGET_DIR/storage/logs/*.log \
+              $TARGET_DIR/tmp/* \
+              $TARGET_DIR/.cache/*
 
-            # Optional: Create a sample text file
             echo "Deployment completed on $(date)" > $TARGET_DIR/deploy_log.txt
 
-            # Restart PHP-FPM
-            sudo systemctl restart php8.1-fpm
+            echo " DEPLOY SUCCESS"
