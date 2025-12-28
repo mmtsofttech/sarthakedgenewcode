@@ -1,4 +1,4 @@
-name: Deploy to Hostinger (SAFE)
+name: Deploy to Hostinger (SAFE + Backup + Cleanup)
 
 on:
   push:
@@ -13,7 +13,32 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy via rsync (no permission issues)
+      - name: Pre-deploy: Fix permissions
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            # Ensure SSH user owns all files
+            chown -R sarthakedge1:sarthakedge1 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
+            # Set directories and file permissions
+            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type d -exec chmod 755 {} \;
+            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type f -exec chmod 644 {} \;
+
+      - name: Backup current site
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+            BACKUP_DIR=/home/sarthakedge1/htdocs/beta.sarthakedge.com_backup_$TIMESTAMP
+            echo "Creating backup at $BACKUP_DIR..."
+            cp -r /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code $BACKUP_DIR
+
+      - name: Deploy via rsync
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -27,15 +52,29 @@ jobs:
               --exclude="storage/logs" \
               ./ /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/
 
-      - name: Fix permissions
+      - name: Post-deploy: Set folder permissions & restart PHP
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
-            chown -R sarthakedge1:sarthakedge1 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
-            chmod -R 755 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
             chmod -R 775 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage
             chmod -R 775 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/bootstrap/cache
             sudo systemctl restart php8.1-fpm
+
+      - name: Clean old temp/cache files
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            echo "Cleaning old temporary and cache files..."
+            # Remove old Laravel cache/log files
+            rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/framework/cache/*
+            rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/framework/views/*
+            rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/logs/*.log
+            # Optional: remove temp files in php_code/tmp or .cache
+            rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/tmp/*
+            rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/.cache/*
