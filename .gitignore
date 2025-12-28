@@ -1,34 +1,28 @@
-/vendor/
+# Node
 node_modules/
 npm-debug.log
 yarn-error.log
 
-# Laravel 4 specific
-bootstrap/compiled.php
-app/storage/
+# Laravel
+/vendor/
+/.env
+/storage/*.key
+/storage/logs/*
+/storage/framework/*
+/bootstrap/cache/*.php
 
-# Laravel 5 & Lumen specific
-public/storage
-public/hot
+# IDEs
+.vscode/
+.idea/
+.qodana.yaml
 
-# Laravel 5 & Lumen specific with changed public path
-public_html/storage
-public_html/hot
+# OS
+.DS_Store
+Thumbs.db
 
-storage/*.key
-.env
-Homestead.yaml
-Homestead.json
-/.vagrant
+# Tests
 .phpunit.result.cache
-/.idea/*
-/storage/installed
 
-#/.phpstorm.meta.php
-#/_ide_helper.php
-#/_ide_helper_models.php
-.vscode
-/qodana.yaml
-
-
-.cursor/rules/my-laravel-rules.mdc
+# Optional
+/public/hot
+/public/storage
