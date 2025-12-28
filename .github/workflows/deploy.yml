@@ -10,9 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout the repository
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Step 2: Pre-deploy: Fix permissions
       - name: Pre-deploy: Fix permissions
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -21,9 +23,10 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
             chown -R sarthakedge1:sarthakedge1 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
-            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type d -exec chmod 755 {} \;
-            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type f -exec chmod 644 {} \;
+            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type d -exec chmod 755 {} \\;
+            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type f -exec chmod 644 {} \\;
 
+      # Step 3: Backup current site
       - name: Backup current site
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -36,6 +39,7 @@ jobs:
             echo "Creating backup at $BACKUP_DIR..."
             cp -r /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code $BACKUP_DIR
 
+      # Step 4: Deploy via rsync
       - name: Deploy via rsync
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -50,6 +54,7 @@ jobs:
               --exclude="storage/logs" \
               ./ /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/
 
+      # Step 5: Post-deploy permissions & restart PHP
       - name: Post-deploy: Set folder permissions & restart PHP
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -61,6 +66,7 @@ jobs:
             chmod -R 775 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/bootstrap/cache
             sudo systemctl restart php8.1-fpm
 
+      # Step 6: Clean old temp/cache files
       - name: Clean old temp/cache files
         uses: appleboy/ssh-action@v1.0.3
         with:
