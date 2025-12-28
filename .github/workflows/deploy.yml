@@ -1,0 +1,57 @@
+name: Deploy to Hostinger (CloudPanel)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Backup current production
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            TIMESTAMP=$(date +%Y%m%d%H%M%S)
+            BACKUP_DIR="/home/sarthakedge1/htdocs/beta.sarthakedge.com/backups/$TIMESTAMP"
+            mkdir -p "$BACKUP_DIR"
+            cp -r /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/* "$BACKUP_DIR" || true
+
+      - name: Upload project to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "./"
+          target: "/home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code"
+          overwrite: true
+
+      - name: Fix permissions
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            chown -R sarthakedge1:sarthakedge1 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
+            chmod -R 755 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
+            chmod -R 775 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage
+            chmod -R 775 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/bootstrap/cache
+
+      - name: Restart PHP-FPM
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            sudo systemctl restart php8.1-fpm
