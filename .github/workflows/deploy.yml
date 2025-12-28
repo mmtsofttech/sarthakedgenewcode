@@ -18,7 +18,7 @@ jobs:
       - name: Prepare SSH key
         run: |
           mkdir -p ~/.ssh
-          cp .github/deploy_key ~/.ssh/id_ed25519
+          cp .github/workflows/deploy_key ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
       # Step 3: Deploy via SSH
