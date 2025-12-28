@@ -10,54 +10,58 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout code
+      # Step 1: Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Prepare SSH key from repo file
-      - name: Prepare SSH key
-        run: |
-          mkdir -p ~/.ssh
-          if [ -f .github/workflows/deploy_key ]; then
-            cp .github/workflows/deploy_key ~/.ssh/id_ed25519
-            chmod 600 ~/.ssh/id_ed25519
-          else
-            echo "Error: deploy_key not found!"
-            exit 1
-          fi
-
-      # Step 3: Deploy via SSH
+      # Step 2: Deploy via SSH using GitHub secret directly
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
           host: 72.61.237.199
           username: sarthakedge1
-          key_path: ~/.ssh/id_ed25519
+          key: ${{ secrets.SSH_KEY }}      # Use GitHub secret directly
           script: |
+            # Set variables
             TIMESTAMP=$(date +"%Y%m%d%H%M%S")
             BACKUP_DIR=/home/sarthakedge1/htdocs/beta.sarthakedge.com_backup_$TIMESTAMP
+            TARGET_DIR=/home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
 
-            # Backup existing site
-            cp -r /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code $BACKUP_DIR
+            # Backup existing site if it exists
+            if [ -d "$TARGET_DIR" ]; then
+              cp -r $TARGET_DIR $BACKUP_DIR
+            fi
 
-            # Deploy new code
-            rsync -avz --delete --exclude=".git" --exclude="node_modules" ./ /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/
+            # Deploy new code from repo
+            rsync -avz --delete --exclude=".git" --exclude="node_modules" ./ $TARGET_DIR/
+
+            # Create required Laravel folders if missing
+            mkdir -p $TARGET_DIR/storage/framework/cache \
+                     $TARGET_DIR/storage/framework/views \
+                     $TARGET_DIR/storage/logs \
+                     $TARGET_DIR/bootstrap/cache \
+                     $TARGET_DIR/tmp \
+                     $TARGET_DIR/.cache
 
             # Set ownership and permissions
-            chown -R sarthakedge1:sarthakedge1 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
-            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type d -exec chmod 755 {} \;
-            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type f -exec chmod 644 {} \;
+            chown -R sarthakedge1:sarthakedge1 $TARGET_DIR
+            find $TARGET_DIR -type d -exec chmod 755 {} \;
+            find $TARGET_DIR -type f -exec chmod 644 {} \;
 
-            # Laravel storage & cache permissions
-            chmod -R 775 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage
-            chmod -R 775 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/bootstrap/cache
+            chmod -R 775 $TARGET_DIR/storage \
+                         $TARGET_DIR/bootstrap/cache \
+                         $TARGET_DIR/tmp \
+                         $TARGET_DIR/.cache
 
-            # Clear cache and logs
-            rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/framework/cache/*
-            rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/framework/views/*
-            rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/logs/*.log
-            rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/tmp/*
-            rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/.cache/*
+            # Clear Laravel cache and logs
+            rm -rf $TARGET_DIR/storage/framework/cache/*
+            rm -rf $TARGET_DIR/storage/framework/views/*
+            rm -rf $TARGET_DIR/storage/logs/*.log
+            rm -rf $TARGET_DIR/tmp/*
+            rm -rf $TARGET_DIR/.cache/*
+
+            # Optional: Create a sample text file
+            echo "Deployment completed on $(date)" > $TARGET_DIR/deploy_log.txt
 
             # Restart PHP-FPM
             sudo systemctl restart php8.1-fpm
