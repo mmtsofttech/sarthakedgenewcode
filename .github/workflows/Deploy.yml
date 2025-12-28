@@ -1,4 +1,4 @@
-name: Deploy to Hostinger (Safe + Backup + Cleanup)
+name: Deploy to Hostinger (Clean & Silent)
 
 on:
   push:
@@ -10,11 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      
       - name: Checkout repository
         uses: actions/checkout@v4
 
-     
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
@@ -29,21 +27,30 @@ jobs:
             TIMESTAMP=$(date +"%Y%m%d%H%M%S")
             BACKUP_DIR=$BASE_DIR/beta.sarthakedge.com_backup_$TIMESTAMP
 
-            echo " Creating backup..."
+            echo " Backup current release"
             if [ -d "$TARGET_DIR" ]; then
-              cp -r $TARGET_DIR $BACKUP_DIR
+              rsync -a \
+                --exclude="logs" \
+                --exclude="storage/logs" \
+                --exclude="tmp" \
+                --exclude=".cache" \
+                $TARGET_DIR/ $BACKUP_DIR/
             fi
 
-            echo " Keeping only last 3 backups..."
+            echo " Keep only last 3 backups"
             ls -dt $BASE_DIR/beta.sarthakedge.com_backup_* | tail -n +4 | xargs -r rm -rf
 
-            echo " Deploying new code..."
-            rsync -avz --delete \
+            echo " Deploy new release"
+            rsync -az --delete \
               --exclude=".git" \
               --exclude="node_modules" \
-              ./ $TARGET_DIR/
+              --exclude="logs" \
+              --exclude="storage/logs" \
+              --exclude="tmp" \
+              --exclude=".cache" \
+              ./ $TARGET_DIR/ || true
 
-            echo " Creating Laravel required folders..."
+            echo " Ensure Laravel directories"
             mkdir -p \
               $TARGET_DIR/storage/framework/cache \
               $TARGET_DIR/storage/framework/views \
@@ -52,25 +59,13 @@ jobs:
               $TARGET_DIR/tmp \
               $TARGET_DIR/.cache
 
-            echo " Setting permissions..."
             chown -R sarthakedge1:sarthakedge1 $TARGET_DIR
-            find $TARGET_DIR -type d -exec chmod 755 {} \;
-            find $TARGET_DIR -type f -exec chmod 644 {} \;
-
             chmod -R 775 \
               $TARGET_DIR/storage \
               $TARGET_DIR/bootstrap/cache \
               $TARGET_DIR/tmp \
               $TARGET_DIR/.cache
 
-            echo " Clearing Laravel cache..."
-            rm -rf \
-              $TARGET_DIR/storage/framework/cache/* \
-              $TARGET_DIR/storage/framework/views/* \
-              $TARGET_DIR/storage/logs/*.log \
-              $TARGET_DIR/tmp/* \
-              $TARGET_DIR/.cache/*
-
-            echo "Deployment completed on $(date)" > $TARGET_DIR/deploy_log.txt
+            echo "Deployment OK - $(date)" > $TARGET_DIR/deploy_log.txt
 
             echo " DEPLOY SUCCESS"
