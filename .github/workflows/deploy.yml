@@ -23,8 +23,8 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
             chown -R sarthakedge1:sarthakedge1 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
-            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type d -exec chmod 755 {} \\;
-            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type f -exec chmod 644 {} \\;
+            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type d -exec chmod 755 {} \;
+            find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type f -exec chmod 644 {} \;
 
       # Step 3: Backup current site
       - name: Backup current site
