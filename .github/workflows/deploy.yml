@@ -1,4 +1,4 @@
-name: "Deploy to Hostinger (SAFE + Backup + Cleanup)"
+name: Deploy to Hostinger
 
 on:
   push:
@@ -10,73 +10,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
-      - name: Checkout code
+      # Step 1: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Pre-deploy: Fix permissions
-      - name: Pre-deploy: Fix permissions
-        uses: appleboy/ssh-action@v1.0.3
+      # Step 2: Prepare SSH key from repo file
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh
+          cp .github/deploy/deploy_key ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+      # Step 3: Deploy via SSH
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
+          host: 72.61.237.199
+          username: sarthakedge1
+          key_path: ~/.ssh/id_ed25519
           script: |
+            # Backup current site
+            TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+            BACKUP_DIR=/home/sarthakedge1/htdocs/beta.sarthakedge.com_backup_$TIMESTAMP
+            cp -r /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code $BACKUP_DIR
+
+            # Deploy new code
+            rsync -avz --delete --exclude=".git" --exclude="node_modules" ./ /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/
+
+            # Set ownership and permissions
             chown -R sarthakedge1:sarthakedge1 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
             find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type d -exec chmod 755 {} \;
             find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type f -exec chmod 644 {} \;
 
-      # Step 3: Backup current site
-      - name: Backup current site
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          script: |
-            TIMESTAMP=$(date +"%Y%m%d%H%M%S")
-            BACKUP_DIR=/home/sarthakedge1/htdocs/beta.sarthakedge.com_backup_$TIMESTAMP
-            echo "Creating backup at $BACKUP_DIR..."
-            cp -r /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code $BACKUP_DIR
-
-      # Step 4: Deploy via rsync
-      - name: Deploy via rsync
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          script: |
-            rsync -avz --delete \
-              --exclude=".git" \
-              --exclude="node_modules" \
-              --exclude=".env" \
-              --exclude="storage/logs" \
-              ./ /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/
-
-      # Step 5: Post-deploy permissions & restart PHP
-      - name: Post-deploy: Set folder permissions & restart PHP
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          script: |
+            # Laravel storage & cache permissions
             chmod -R 775 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage
             chmod -R 775 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/bootstrap/cache
-            sudo systemctl restart php8.1-fpm
 
-      # Step 6: Clean old temp/cache files
-      - name: Clean old temp/cache files
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          script: |
-            echo "Cleaning old temporary and cache files..."
+            # Clear cache and logs
             rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/framework/cache/*
             rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/framework/views/*
             rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/logs/*.log
             rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/tmp/*
             rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/.cache/*
+
+            # Restart PHP
+            sudo systemctl restart php8.1-fpm
