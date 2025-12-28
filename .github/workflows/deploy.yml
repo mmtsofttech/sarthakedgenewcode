@@ -1,4 +1,4 @@
-name: Deploy to Hostinger (SAFE + Backup + Cleanup)
+name: "Deploy to Hostinger (SAFE + Backup + Cleanup)"
 
 on:
   push:
@@ -20,9 +20,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
-            # Ensure SSH user owns all files
             chown -R sarthakedge1:sarthakedge1 /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code
-            # Set directories and file permissions
             find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type d -exec chmod 755 {} \;
             find /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code -type f -exec chmod 644 {} \;
 
@@ -71,10 +69,8 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
             echo "Cleaning old temporary and cache files..."
-            # Remove old Laravel cache/log files
             rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/framework/cache/*
             rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/framework/views/*
             rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/storage/logs/*.log
-            # Optional: remove temp files in php_code/tmp or .cache
             rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/tmp/*
             rm -rf /home/sarthakedge1/htdocs/beta.sarthakedge.com/php_code/.cache/*
